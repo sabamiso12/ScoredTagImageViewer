@@ -7,7 +7,7 @@ import json
 import tkinter as tk
 from PIL import ImageTk, Image
 import numpy as np
-import pyperclip  # install
+import pyperclip
 
 # スペース改行を無視してコンマ区切りをマッチ
 re_separater = re.compile("[\t\n\r ]*,[\t\n\r ]*")
@@ -67,6 +67,28 @@ def toggle_object(widget: tk.Widget, side=tk.TOP):
         widget.pack(side=side)
 
 
+def keep_resize(img: Image.Image, size: tuple, outfit_degree: float, resample):
+    # 比率保ってリサイズ
+    # outfit_degreeが0でinnerfit=内側をpadding、1でoutfit=外側をcrop、中間も可
+    org_w, org_h = img.width, img.height
+    w, h = size
+    min_ratio = min(w/org_w, h/org_h)
+    max_ratio = max(w/org_w, h/org_h)
+    ratio = outfit_degree * max_ratio + (1-outfit_degree)*min_ratio
+    r_w, r_h = int(ratio*org_w), int(ratio*org_h)
+    img = img.resize((r_w, r_h), resample=resample)
+    img = img.crop((r_w//2 - w//2, r_h//2 - h//2, r_w//2 + w//2 + w % 2, r_h//2 + h//2 + w % 2))
+    return img
+
+
+def read_json_file(file_path):
+    # scoredTagのjsonを読み込み
+    with open(file_path, "r") as f:
+        json_data = json.load(f)
+    # wd-14-taggerでは[0]がrating,[1]がtag
+    return json_data[0] | json_data[1]
+
+
 class FoldingLabel(tk.Label):
     def __init__(self, master, target, text, **args) -> None:
         super().__init__(master, text=text ** args)
@@ -98,6 +120,7 @@ class DataManager:
         tagtext_ext = "txt"
         jsons = glob.glob(jsons_dir + "/*.json")
         print(len(jsons))
+        # jsonと画像両方あるやつだけ読み込む
         for json_path in jsons:
             name = os.path.splitext(os.path.basename(json_path))[0]
             # 画像があるか探す
@@ -730,13 +753,13 @@ class ImageFilterUIFrame(tk.Frame):
         self.option_lbl.pack(side=tk.TOP)
         self.option_apply_btn = tk.Button(self.option_frame, text="Apply")
         # REMOVEDの有無
-        self.option_rm = tk.IntVar(value=0)
+        self.option_rm = tk.IntVar(value=1)
         self.option_rm_lbl = tk.Label(self.option_frame, text="Filter Removed")
         self.option_rm_cbn = tk.Radiobutton(self.option_frame, text="Enable", variable=self.option_rm, value=1)
         self.option_rm_inv_cbn = tk.Radiobutton(self.option_frame, text="Invert", variable=self.option_rm, value=2)
         self.option_rm_off_cbn = tk.Radiobutton(self.option_frame, text="Disable", variable=self.option_rm, value=0)
         # DUPLICATEの有無
-        self.option_dup = tk.IntVar(value=0)
+        self.option_dup = tk.IntVar(value=1)
         self.option_dup_lbl = tk.Label(self.option_frame, text="Filter Duplicated")
         self.option_dup_cbn = tk.Radiobutton(self.option_frame, text="Enable", variable=self.option_dup, value=1)
         self.option_dup_inv_cbn = tk.Radiobutton(self.option_frame, text="Invert", variable=self.option_dup, value=2)
@@ -1393,32 +1416,6 @@ class ImageBrowser(tk.Tk):
 
     def refresh(self, all=False):
         self.filterd_gallery_frame.refresh_images(all=all)
-
-
-def keep_resize(img: Image.Image, size: tuple, outfit_degree: float, resample):
-    # 比率保ってリサイズ
-    # outfit_degreeが0でinnerfit=内側をpadding、1でoutfit=外側をcrop、中間も可
-    org_w, org_h = img.width, img.height
-    w, h = size
-    min_ratio = min(w/org_w, h/org_h)
-    max_ratio = max(w/org_w, h/org_h)
-    ratio = outfit_degree * max_ratio + (1-outfit_degree)*min_ratio
-    r_w, r_h = int(ratio*org_w), int(ratio*org_h)
-    img = img.resize((r_w, r_h), resample=resample)
-    img = img.crop((r_w//2 - w//2, r_h//2 - h//2, r_w//2 + w//2 + w % 2, r_h//2 + h//2 + w % 2))
-    return img
-
-
-def read_json_file(file_path):
-    with open(file_path, "r") as f:
-        json_data = json.load(f)
-    return json_data[0] | json_data[1]
-
-
-"""
-{phone_screen}<0.05 and {fake_screenshot}<0.05 and {magazine_cover}<0.05 and {cover} <0.05 and {twitter_username}<0.05 and {text_focus}<0.05 and {english_text}<0.05 and {artist_name}<0.05 and {character_name}<0.05 and {copyright_name}<0.05
-{comic}<0.05 and {multiple_views}<0.05 and {4koma}<0.05 and {photo_inset} <0.05
-"""
 
 
 def main():
